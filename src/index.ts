@@ -190,7 +190,10 @@ const app = new Elysia()
     }
   })
 
-  .listen(process.env.PORT || 3000);
+  .listen({
+    port: parseInt(process.env.PORT || "8080"),
+    // hostname: "0.0.0.0",
+  });
 
 console.log(
   `🦊 ChirpChirp is running at ${app.server?.hostname}:${app.server?.port}`
