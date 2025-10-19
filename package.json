@@ -3,7 +3,11 @@
   "version": "1.0.50",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts"
+    "dev": "bun run --watch src/index.ts",
+    "docker:build": "docker build -t core-api-service .",
+    "docker:run": "docker run -p 3000:3000 --env-file .env --name core-api-service core-api-service",
+    "docker:stop": "docker stop core-api-service && docker rm core-api-service",
+    "docker:test": "bun run docker:build && bun run docker:run"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.75.1",
