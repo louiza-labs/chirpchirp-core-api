@@ -63,19 +63,69 @@ const app = new Elysia()
     const page = parseInt(query.page as string) || 1;
     const limit = parseInt(query.limit as string) || 20;
     const offset = (page - 1) * limit;
+    const timeRange = (query.timeRange as string) || "All";
+    const speciesFilter = query.species as string | undefined;
 
     try {
-      // Get total count
-      const { count } = await supabase
+      // Calculate date threshold based on time range
+      let dateThreshold: string | null = null;
+      const now = new Date();
+
+      switch (timeRange) {
+        case "1D":
+          dateThreshold = new Date(
+            now.getTime() - 24 * 60 * 60 * 1000
+          ).toISOString();
+          break;
+        case "7D":
+          dateThreshold = new Date(
+            now.getTime() - 7 * 24 * 60 * 60 * 1000
+          ).toISOString();
+          break;
+        case "1M":
+          dateThreshold = new Date(
+            now.getTime() - 30 * 24 * 60 * 60 * 1000
+          ).toISOString();
+          break;
+        case "3M":
+          dateThreshold = new Date(
+            now.getTime() - 90 * 24 * 60 * 60 * 1000
+          ).toISOString();
+          break;
+        case "1YR":
+          dateThreshold = new Date(
+            now.getTime() - 365 * 24 * 60 * 60 * 1000
+          ).toISOString();
+          break;
+        case "All":
+        default:
+          dateThreshold = null;
+          break;
+      }
+
+      // Build count query with date filter
+      let countQuery = supabase
         .from("images")
         .select("*", { count: "exact", head: true });
+      if (dateThreshold) {
+        countQuery = countQuery.gte("taken_on", dateThreshold);
+      }
+      const { count } = await countQuery;
 
-      // Get images
-      const { data: images, error: imagesError } = await supabase
+      // Build images query with date filter
+      let imagesQuery = supabase
         .from("images")
         .select("*")
-        .order("taken_on", { ascending: false })
-        .range(offset, offset + limit - 1);
+        .order("taken_on", { ascending: false });
+
+      if (dateThreshold) {
+        imagesQuery = imagesQuery.gte("taken_on", dateThreshold);
+      }
+
+      const { data: images, error: imagesError } = await imagesQuery.range(
+        offset,
+        offset + limit - 1
+      );
 
       if (imagesError) throw imagesError;
 
@@ -115,12 +165,23 @@ const app = new Elysia()
         .filter((unfilteredImage) => {
           const attrs = attributionsByImage[unfilteredImage.id];
           // Only include images that have attributions with valid species
-          return (
-            attrs &&
-            attrs.some(
+          if (
+            !attrs ||
+            !attrs.some(
               (attr: Attribution) => attr.species && attr.species.trim() !== ""
             )
-          );
+          ) {
+            return false;
+          }
+
+          // If species filter is provided, check if any attribution matches
+          if (speciesFilter) {
+            return attrs.some(
+              (attr: Attribution) => attr.species === speciesFilter
+            );
+          }
+
+          return true;
         })
         .map((img) => ({
           ...img,
@@ -134,6 +195,10 @@ const app = new Elysia()
           limit,
           total: count || 0,
           totalPages: Math.ceil((count || 0) / limit),
+        },
+        filters: {
+          timeRange,
+          species: speciesFilter || null,
         },
       };
     } catch (error) {
@@ -195,6 +260,24 @@ const app = new Elysia()
       };
     } catch (error) {
       console.error(`Error fetching attributions for ${params.id}:`, error);
+      throw error;
+    }
+  })
+  // get all species
+  .get("/species", async ({ query }) => {
+    try {
+      const { data: species } = await supabase
+        .from("attribution")
+        .select("species", {});
+
+      const speciesSet = new Set(species);
+      const speciesArray = Array.from(speciesSet);
+
+      return {
+        species: speciesArray,
+      };
+    } catch (error) {
+      console.error("Error fetching images:", error);
       throw error;
     }
   })
