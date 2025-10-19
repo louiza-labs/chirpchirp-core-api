@@ -111,12 +111,21 @@ const app = new Elysia()
       );
 
       // Combine images with their attributions
-      const imagesWithAttributions: ImageWithAttributions[] = images.map(
-        (img) => ({
+      const imagesWithAttributions: ImageWithAttributions[] = images
+        .filter((unfilteredImage) => {
+          const attrs = attributionsByImage[unfilteredImage.id];
+          // Only include images that have attributions with valid species
+          return (
+            attrs &&
+            attrs.some(
+              (attr: Attribution) => attr.species && attr.species.trim() !== ""
+            )
+          );
+        })
+        .map((img) => ({
           ...img,
           attributions: attributionsByImage[img.id] || [],
-        })
-      );
+        }));
 
       return {
         images: imagesWithAttributions,
