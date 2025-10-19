@@ -266,18 +266,33 @@ const app = new Elysia()
   // get all species
   .get("/species", async ({ query }) => {
     try {
-      const { data: species } = await supabase
-        .from("attribution")
-        .select("species", {});
+      const { data: attributions, error } = await supabase
+        .from("attributions")
+        .select("species");
 
-      const speciesSet = new Set(species);
-      const speciesArray = Array.from(speciesSet);
+      if (error) throw error;
+
+      // Count instances of each species
+      const speciesCounts = (attributions || []).reduce(
+        (acc: Record<string, number>, attr: { species: string }) => {
+          if (attr.species && attr.species.trim() !== "") {
+            acc[attr.species] = (acc[attr.species] || 0) + 1;
+          }
+          return acc;
+        },
+        {}
+      );
+
+      // Convert to array of objects with species and count
+      const speciesArray = Object.entries(speciesCounts)
+        .map(([species, count]) => ({ species, count }))
+        .sort((a, b) => b.count - a.count); // Sort by count descending
 
       return {
         species: speciesArray,
       };
     } catch (error) {
-      console.error("Error fetching images:", error);
+      console.error("Error fetching species:", error);
       throw error;
     }
   })
