@@ -60,12 +60,13 @@ const app = new Elysia()
 
   // Get all images with their attributions (paginated)
   .get("/images", async ({ query }) => {
+    console.log("the query", query);
     const page = parseInt(query.page as string) || 1;
     const limit = parseInt(query.limit as string) || 20;
     const offset = (page - 1) * limit;
     const timeRange = (query.timeRange as string) || "All";
     const speciesFilter = query.species as string | undefined;
-
+    console.log("the speciesFilter", speciesFilter);
     try {
       // Calculate date threshold based on time range
       let dateThreshold: string | null = null;
@@ -188,6 +189,8 @@ const app = new Elysia()
           attributions: attributionsByImage[img.id] || [],
         }));
 
+      console.log("imagesWithAttributions", imagesWithAttributions);
+
       return {
         images: imagesWithAttributions,
         pagination: {
@@ -210,6 +213,7 @@ const app = new Elysia()
   // Get a specific image with its attributions
   .get("/images/:id", async ({ params }) => {
     try {
+      console.log("the params", params);
       // Get the image
       const { data: image, error: imageError } = await supabase
         .from("images")
