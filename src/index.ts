@@ -195,7 +195,18 @@ const app = new Elysia()
         // Filter out images where *any* attribution has species === "No Cv Result"
         .filter((image) =>
           image.attributions.every(
-            (attribution: Attribution) => attribution.species !== "No Cv Result"
+            // Implement a blacklist of species names to exclude
+            (attribution: Attribution) => {
+              const speciesBlacklist = [
+                "No Cv Result",
+                "Animal",
+                "Cyanocitta Species",
+                "Eastern Gray Squirrel",
+                "Unknown",
+                "Unidentified",
+              ];
+              return !speciesBlacklist.includes(attribution.species);
+            }
           )
         );
       console.log("imagesWithAttributions", imagesWithAttributions);
