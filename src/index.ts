@@ -144,6 +144,8 @@ const app = new Elysia()
 
       // Get attributions for all images
       const imageIds = images.map((img) => img.id);
+      console.log("the imageIds", imageIds);
+
       const { data: attributions, error: attribError } = await supabase
         .from("attributions")
         .select("*")
@@ -151,6 +153,7 @@ const app = new Elysia()
 
       if (attribError) throw attribError;
 
+      console.log("the attributions", attributions);
       // Group attributions by image_id
       const attributionsByImage = (attributions || []).reduce(
         (acc: Record<string, Attribution[]>, attr: Attribution) => {
@@ -162,10 +165,11 @@ const app = new Elysia()
       );
 
       // Combine images with their attributions
-      const imagesWithAttributions: ImageWithAttributions[] = images
+      let imagesWithAttributions: ImageWithAttributions[] = images
         .filter((unfilteredImage) => {
           const attrs = attributionsByImage[unfilteredImage.id];
           // Only include images that have attributions with valid species
+          console.log("the attrs", attrs);
           if (
             !attrs ||
             !attrs.some(
@@ -187,8 +191,13 @@ const app = new Elysia()
         .map((img) => ({
           ...img,
           attributions: attributionsByImage[img.id] || [],
-        }));
-
+        }))
+        // Filter out images where *any* attribution has species === "No Cv Result"
+        .filter((image) =>
+          image.attributions.every(
+            (attribution: Attribution) => attribution.species !== "No Cv Result"
+          )
+        );
       console.log("imagesWithAttributions", imagesWithAttributions);
 
       return {
@@ -302,7 +311,7 @@ const app = new Elysia()
   })
 
   .listen({
-    port: parseInt(process.env.PORT || "8080"),
+    port: parseInt(process.env.PORT || "8000"),
     // hostname: "0.0.0.0",
   });
 
