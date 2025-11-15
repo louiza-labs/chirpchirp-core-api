@@ -172,17 +172,25 @@ const app = new Elysia()
             );
           }
 
-          // If no attributions, include the image as fallback
+          // If no attributions at all, include the image as fallback
           if (!hasAttributions) {
             return true;
           }
 
-          // If has attributions, exclude if ALL attributions are blacklisted
+          // If has attributions, exclude if ANY attribution is blacklisted
+          const hasBlacklistedAttribution = image.attributions.some(
+            (attribution: Attribution) =>
+              speciesBlacklist.includes(attribution.species)
+          );
+
+          if (hasBlacklistedAttribution) {
+            return false;
+          }
+
+          // Must have at least one valid non-empty species
           const hasValidAttribution = image.attributions.some(
             (attribution: Attribution) =>
-              attribution.species &&
-              attribution.species.trim() !== "" &&
-              !speciesBlacklist.includes(attribution.species)
+              attribution.species && attribution.species.trim() !== ""
           );
 
           return hasValidAttribution;
