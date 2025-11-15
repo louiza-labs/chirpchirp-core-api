@@ -1,19 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { Elysia } from "elysia";
 
-// ============================================================================
-// Supabase Setup
-// ============================================================================
-
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_ANON_KEY!
 );
-
-// ============================================================================
-// Types
-// ============================================================================
-
 interface Image {
   id: string;
   taken_on: string;
@@ -50,23 +41,17 @@ interface ImageWithAttributions extends Image {
   attributions: Attribution[];
 }
 
-// ============================================================================
-// API Routes
-// ============================================================================
-
 const app = new Elysia()
   // Health check
   .get("/", () => ({ status: "ok", service: "core-api-service" }))
 
   // Get all images with their attributions (paginated)
   .get("/images", async ({ query }) => {
-    console.log("the query", query);
     const page = parseInt(query.page as string) || 1;
     const limit = parseInt(query.limit as string) || 20;
     const offset = (page - 1) * limit;
     const timeRange = (query.timeRange as string) || "All";
     const speciesFilter = query.species as string | undefined;
-    console.log("the speciesFilter", speciesFilter);
     try {
       // Calculate date threshold based on time range
       let dateThreshold: string | null = null;
@@ -144,7 +129,6 @@ const app = new Elysia()
 
       // Get attributions for all images
       const imageIds = images.map((img) => img.id);
-      console.log("the imageIds", imageIds);
 
       const { data: attributions, error: attribError } = await supabase
         .from("attributions")
@@ -153,7 +137,6 @@ const app = new Elysia()
 
       if (attribError) throw attribError;
 
-      console.log("the attributions", attributions);
       // Group attributions by image_id
       const attributionsByImage = (attributions || []).reduce(
         (acc: Record<string, Attribution[]>, attr: Attribution) => {
@@ -165,51 +148,45 @@ const app = new Elysia()
       );
 
       // Combine images with their attributions
+      const speciesBlacklist = [
+        "No Cv Result",
+        "Animal",
+        "Cyanocitta Species",
+        "Eastern Gray Squirrel",
+        "Unknown",
+        "Unidentified",
+      ];
+
       let imagesWithAttributions: ImageWithAttributions[] = images
-        .filter((unfilteredImage) => {
-          const attrs = attributionsByImage[unfilteredImage.id];
-          // Only include images that have attributions with valid species
-          console.log("the attrs", attrs);
-          if (
-            !attrs ||
-            !attrs.some(
-              (attr: Attribution) => attr.species && attr.species.trim() !== ""
-            )
-          ) {
-            return false;
-          }
-
-          // If species filter is provided, check if any attribution matches
-          if (speciesFilter) {
-            return attrs.some(
-              (attr: Attribution) => attr.species === speciesFilter
-            );
-          }
-
-          return true;
-        })
         .map((img) => ({
           ...img,
           attributions: attributionsByImage[img.id] || [],
         }))
-        // Filter out images where *any* attribution has species === "No Cv Result"
-        .filter((image) =>
-          image.attributions.every(
-            // Implement a blacklist of species names to exclude
-            (attribution: Attribution) => {
-              const speciesBlacklist = [
-                "No Cv Result",
-                "Animal",
-                "Cyanocitta Species",
-                "Eastern Gray Squirrel",
-                "Unknown",
-                "Unidentified",
-              ];
-              return !speciesBlacklist.includes(attribution.species);
-            }
-          )
-        );
-      console.log("imagesWithAttributions", imagesWithAttributions);
+        .filter((image) => {
+          const hasAttributions = image.attributions.length > 0;
+
+          // If species filter is provided, only include images with matching attributions
+          if (speciesFilter) {
+            return image.attributions.some(
+              (attr: Attribution) => attr.species === speciesFilter
+            );
+          }
+
+          // If no attributions, include the image as fallback
+          if (!hasAttributions) {
+            return true;
+          }
+
+          // If has attributions, exclude if ALL attributions are blacklisted
+          const hasValidAttribution = image.attributions.some(
+            (attribution: Attribution) =>
+              attribution.species &&
+              attribution.species.trim() !== "" &&
+              !speciesBlacklist.includes(attribution.species)
+          );
+
+          return hasValidAttribution;
+        });
 
       return {
         images: imagesWithAttributions,
@@ -233,7 +210,6 @@ const app = new Elysia()
   // Get a specific image with its attributions
   .get("/images/:id", async ({ params }) => {
     try {
-      console.log("the params", params);
       // Get the image
       const { data: image, error: imageError } = await supabase
         .from("images")
